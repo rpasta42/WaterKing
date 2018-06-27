@@ -8,9 +8,23 @@ function Weapon() {
    this.fire_rate = 0;
 }
 
+
+function MovableObject(x, y) {
+
+   this.x = x;
+   this.y = y;
+
+
+   this.afterMove = function(physObj) {
+      //physObj
+   }
+
+}
+
+
 function Player() {
 
-   this.x = 0;
+   this.x = 5;
    this.y = 0;
 
    this.isAlive = true;
@@ -19,6 +33,21 @@ function Player() {
 
    this.weapons = [];
    this.activeWeapIndex = 0;
+
+
+   this.moveUp = function() {
+      this.y += 0.05;
+      console.log(this.y);
+   }
+   this.moveDown = function() {
+      this.y -= 0.05;
+   }
+   this.moveLeft = function() {
+      this.x -= 0.05;
+   }
+   this.moveRight = function() {
+      this.x += 0.05;
+   }
 
 
    this.draw = function() {
@@ -43,110 +72,64 @@ function Game(conf) {
 
       this.blocks = get_level();
       this.player = new Player();
-      this.phys_eng = init_matter(this.blocks, this.player);
 
       this.camX = 0, this.camY = 0;
       this.i = 0;
 
       console.log(this.blocks);
 
-      //START CANVAS INIT STUFF
-      var canvas = document.getElementById(this.conf.canvas_id);
-      canvas.width = conf.width;
-      canvas.height = conf.height;
-      if (!canvas.getContext)
-         alert('Could not obtain context');
-      var ctx = canvas.getContext('2d');
-      this.canvas = canvas;
-      this.ctx = ctx;
-      //END CANVAS INIT STUFF
+      var matter_ret = init_matter(document.body, this.blocks, this.player, conf);
+      this.engine = matter_ret[0];
+      this.render = matter_ret[1];
 
    }
 
    this.init(conf);
-   var canvas = this.canvas;
-   var ctx = this.ctx;
-
-   this.draw = function() {
-
-      ctx.clearRect(0, 0, conf.width, conf.height);
-
-      if (this_.i++ % 10 == 0) {
-         Matter.Engine.update(this_.phys_eng);
-      }
-      var bodies = Matter.Composite.allBodies(this_.phys_eng.world);
-
-      if (this_.i == 5) console.log('kk:', bodies);
-
-      ctx.fillStyle = '#afa';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.beginPath();
-
-      for (var i = 0; i < bodies.length; i++) {
-         var body = bodies[i];
-         //if (body.label != 'Rectangle Body')
-         //   continue;
-
-         var vertices = body.vertices;
-         ctx.moveTo(vertices[0].x, vertices[0].y);
-         for (var j = 1; j < vertices.length; j++) {
-            ctx.lineTo(vertices[j].x, vertices[j].y);
-         }
-         ctx.lineTo(vertices[0].x, vertices[0].y);
-      }
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = '#999';
-      ctx.stroke();
-
-      /////
-
-
-      for (var i in this_.blocks) {
-         var block = this_.blocks[i];
-
-         ctx.fillStyle = 'rgb(200, 0, 0)';
-
-         var xPos = block.x*50+this_.camX;
-         var yPos = block.y*50+this_.camY;
-
-         ctx.fillRect(xPos, yPos, 50, 50);
-
-         //console.log('drawing', this_.blocks.length);
-         //block.debugPrint();
-
-      }
-
-   }
 
    this.run = function() {
-      setInterval(this_.draw, this_.conf.run_interval);
+      Engine.run(this.engine);
+      Render.run(this.render);
    }
-
 
    $(document).keydown(function(event) {
       var keyDown = event.keyCode;
 
       //console.log('key pressed:', keyDown);
+      var blk_len = this_.conf.block_len;
+
+      var isMoving = ([87, 83, 65, 68].includes(keyDown)) ? true : false;
+      if (isMoving) {
+
+         var phys_player = Matter.Composite.get(this_.engine.world, 'player', 'body');
+         this_.player.x = phys_player.position.x / blk_len;
+         this_.player.y = phys_player.position.y / blk_len;
+      }
 
       if (keyDown == 87) { //w
-         this_.camY += 1;
+         this_.player.moveUp();
       }
-      if (keyDown == 83) { //s
-         this_.camY -= 1;
+      else if (keyDown == 83) { //s
+         this_.player.moveDown();
       }
 
       else if (keyDown == 65) { //a
-         this_.camX -= 1;
+         this_.player.moveLeft();
       }
       else if (keyDown == 68) { //d
-         this_.camX += 1;
+         this_.player.moveRight();
       }
 
-      var bodies = Matter.Composite.allBodies(this_.phys_eng.world);
-      var play = Matter.Composite.get(this_.phys_eng.world, 'player', 'body');
-      if (play != null) {
-         play.x = this_.camX;
-         play.y = this_.camY;
+      if (isMoving) {
+         var newX = this_.player.x * this_.conf.block_len;
+         var newY  = this_.player.y * this_.conf.block_len;
+
+         Body.setPosition(phys_player, {x:newX, y:newY});
+
+      }
+
+
+      var bodies = Matter.Composite.allBodies(this_.engine.world);
+      if (phys_player != null) {
       }
 
    });
@@ -163,7 +146,10 @@ $(function() {
       run_interval : 40,
       canvas_id : 'canvas',
       width : 800,
-      height : 600
+      height : 600,
+
+      block_len : 50,
+      player_radius : 25
    };
 
    var game = new Game(conf);
